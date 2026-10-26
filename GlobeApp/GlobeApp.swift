@@ -87,7 +87,7 @@ struct MapScreen: View {
 
     private var mapLayer: some View {
         ImmersiveMapView()
-            .camera(camera, position: Self.overview)
+            .camera(camera)
             .enableCameraUIControls(settings.engineControls)
             .night(settings.night)
             .labels(isEnabled: settings.labels)
@@ -253,6 +253,10 @@ struct MapScreen: View {
     private func wireCallbacks() {
         guard !callbacksReady else { return }
         callbacksReady = true
+        // 初始视角只在启动时用控制器落一次。不要用 .camera(camera, position:) 声明式传位：
+        // 引擎会把「声明位置」与「当前已应用位置」做差分，fly/jump 之后两者不一致，
+        // 下一次界面刷新（比如点一下屏幕）就会把相机拽回声明位置（v2 真机实测的跳回 bug）。
+        camera.jump(to: Self.overview)
         camera.onUserInteractionBegan = {
             autoRotate = false
         }
@@ -414,7 +418,7 @@ struct SettingsView: View {
                     Toggle("引擎自带相机控件", isOn: $settings.engineControls)
                 }
                 Section("关于") {
-                    LabeledContent("版本", value: "2.0")
+                    LabeledContent("版本", value: "2.1")
                     Text("地图数据 © OpenStreetMap 贡献者（ODbL）；地名搜索：OSM Nominatim；渲染引擎：ImmersiveMap（MIT）")
                         .font(.caption)
                         .foregroundStyle(.secondary)
