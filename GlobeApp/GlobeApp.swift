@@ -110,6 +110,9 @@ struct MapScreen: View {
     /// v2.1 真机实测表现为自动旋转转一段就被拽回复位、循环往复。
     private var effectiveCameraSettings: ImmersiveMapSettings.CameraSettings {
         var cam = ImmersiveMapSettings.default.camera
+        // 引擎默认 rotationGestureSensitivity = -0.6，双指旋转方向与手指相反；
+        // 翻成正值，地图跟随手指同向转（幅度保持引擎默认的 0.6）。
+        cam.rotationGestureSensitivity = 0.6
         if autoRotate {
             cam.globeUprightPull = nil
         }
@@ -435,7 +438,7 @@ struct SettingsView: View {
                     Toggle("引擎自带相机控件", isOn: $settings.engineControls)
                 }
                 Section("关于") {
-                    LabeledContent("版本", value: "2.4")
+                    LabeledContent("版本", value: "2.5")
                     Text("地名语言说明：地图数据本身带有中文名，但地图引擎的内置字库只有拉丁与西里尔字形、画不出汉字，所以地名目前只能显示英文或当地语言。等引擎支持中文字形后会再把中文开关加回来。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
