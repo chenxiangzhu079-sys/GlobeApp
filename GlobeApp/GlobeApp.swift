@@ -33,9 +33,10 @@ struct MapScreen: View {
     @State private var showSettings = false
     @State private var centerLat = 27.0
     @State private var centerLon = 108.0
-    @State private var lastPosition: ImmersiveMapCameraPosition?
     @State private var callbacksReady = false
     @FocusState private var searchFocused: Bool
+
+    private let spinTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     /// 开局视角：以中国为中心的全球视角。
     private static let overview = ImmersiveMapCameraPosition(latitudeDegrees: 27,
@@ -74,13 +75,8 @@ struct MapScreen: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(settings: settings)
         }
-        .onChange(of: settings.chineseLabels) { _, _ in
-            // 语言是在瓦片预备阶段烘焙进标注的：已备好的瓦片不会原地变语言。
-            // 地图本体带了按语言区分的 .id（见 mapLayer），切换语言会重建地图、
-            // 强制按新语言重新备瓦；这里把相机跳回切换前的位置，视角不丢。
-            if let position = lastPosition {
-                camera.jump(to: position)
-            }
+        .onReceive(spinTimer) { _ in
+            spinStep()
         }
         .onAppear {
             wireCallbacks()
@@ -102,17 +98,11 @@ struct MapScreen: View {
             .atmosphere(isEnabled: settings.atmosphere)
             .shadows(isEnabled: settings.shadows)
             .globe(isEnabled: settings.sphere)
-        if settings.chineseLabels {
-            view = view.labelSettings(language: ImmersiveMapSettings.LabelLanguage("zh"))
-        }
         return view
             .markers(markers, coordinate: \.coordinate, anchor: .bottom) { marker in
                 PinView(title: marker.title, isMe: marker.isMe)
             }
             .ignoresSafeArea()
-            // 按语言区分视图身份：一切换语言就重建地图本体，逼瓦片按新语言重备
-            // （配合 onChange 里的相机恢复）。其它设置都是实时生效的，不走这条路。
-            .id(settings.chineseLabels)
     }
 
     /// 自动旋转期间关掉引擎的「回正拉力」（GlobeUprightPull，默认开启）：
@@ -197,12 +187,7 @@ struct MapScreen: View {
             roundButton("plus", label: "放大") { zoomStep(1) }
             roundButton("minus", label: "缩小") { zoomStep(-1) }
             roundButton(autoRotate ? "pause.fill" : "rotate.3d", label: "自动旋转") {
-                if autoRotate {
-                    stopRotation()
-                } else {
-                    autoRotate = true
-                    startRotation()
-                }
+                autoRotate.toggle()
             }
             roundButton("gearshape.fill", label: "设置") { showSettings = true }
         }
@@ -286,10 +271,9 @@ struct MapScreen: View {
         // 下一次界面刷新（比如点一下屏幕）就会把相机拽回声明位置（v2 真机实测的跳回 bug）。
         camera.jump(to: Self.overview)
         camera.onUserInteractionBegan = {
-            stopRotation()
+            autoRotate = false
         }
         camera.onCameraPositionChanged = { position in
-            lastPosition = position
             let lat = (position.latitudeDegrees * 1000).rounded() / 1000
             let lon = (position.longitudeDegrees * 1000).rounded() / 1000
             if lat != centerLat || lon != centerLon {
@@ -333,7 +317,7 @@ struct MapScreen: View {
         guard let coordinate = result.coordinate else { return }
         showResults = false
         searchFocused = false
-        stopRotation()
+        autoRotate = false
         markers = [PlaceMarker(title: result.shortName, coordinate: coordinate)]
         info = PlaceInfo(title: result.shortName, detail: result.subtitle, coordinate: coordinate)
         camera.fly(to: ImmersiveMapCameraPosition(latitudeDegrees: coordinate.latitude,
@@ -362,12 +346,12 @@ struct MapScreen: View {
     }
 
     private func locateMe() {
-        stopRotation()
+        autoRotate = false
         locationManager.requestLocation()
     }
 
     private func goHome() {
-        stopRotation()
+        autoRotate = false
         camera.fly(to: Self.overview)
     }
 
@@ -390,34 +374,19 @@ struct MapScreen: View {
                                                   pitch: current.pitch))
     }
 
-    private func stopRotation() {
-        autoRotate = false
-        camera.cancelFollow()
-    }
-
-    /// 连续自转：沿当前纬度线用 follow 匀速巡航一整圈（linear = 恒定地速，
-    /// 不再是 v2.2 那种一段一停的分步飞行）。走完一圈若开关还开着就续下一圈。
-    /// 经度漂移不受引擎回正拉力约束；旋转期间回正拉力另由 effectiveCameraSettings 关掉。
-    private func startRotation() {
-        guard let current = camera.currentCameraPosition() else { return }
-        let lat = current.latitudeDegrees
-        var points: [GeoCoordinate] = [GeoCoordinate(latitude: lat, longitude: current.longitudeDegrees)]
-        var lon = current.longitudeDegrees
-        for _ in 0..<24 {
-            lon += 15
-            var wrapped = lon
-            while wrapped > 180 { wrapped -= 360 }
-            points.append(GeoCoordinate(latitude: lat, longitude: wrapped))
-        }
-        camera.follow(path: ImmersiveMapGeoPath(waypoints: points), duration: 90, curve: .linear) { finished in
-            guard finished else { return }
-            DispatchQueue.main.async {
-                if autoRotate {
-                    startRotation()
-                }
-            }
-        }
-    }
+    /// 连续自转：相机本身完全不动，每帧只把中心经度推进一小步（约 4.2°/秒）。
+    /// 纬度/方位/俯仰/缩放都不变，旋转轴就是地轴；没有路径分段，也没有动画衔接，
+    /// 所以不会有 v2.3 follow 巡航那种一段一段的拉扯感。
+    private func spinStep() {
+        guard autoRotate, let current = camera.currentCameraPosition() else { return }
+        var lon = current.longitudeDegrees + 0.07
+        if lon > 180 { lon -= 360 }
+        camera.jump(to: ImmersiveMapCameraPosition(latitudeDegrees: current.latitudeDegrees,
+                                                   longitudeDegrees: lon,
+                                                   zoom: current.zoom,
+                                                   bearing: current.bearing,
+                                                   pitch: current.pitch))
+    }    }
 }
 
 // MARK: - 标记针
@@ -453,7 +422,6 @@ struct SettingsView: View {
                 Section("地图外观") {
                     Toggle("夜间模式", isOn: $settings.night)
                     Toggle("地名标注", isOn: $settings.labels)
-                    Toggle("地名中文显示", isOn: $settings.chineseLabels)
                     Toggle("大气层", isOn: $settings.atmosphere)
                     Toggle("阴影效果", isOn: $settings.shadows)
                 }
@@ -467,7 +435,10 @@ struct SettingsView: View {
                     Toggle("引擎自带相机控件", isOn: $settings.engineControls)
                 }
                 Section("关于") {
-                    LabeledContent("版本", value: "2.3")
+                    LabeledContent("版本", value: "2.4")
+                    Text("地名语言说明：地图数据本身带有中文名，但地图引擎的内置字库只有拉丁与西里尔字形、画不出汉字，所以地名目前只能显示英文或当地语言。等引擎支持中文字形后会再把中文开关加回来。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Text("地图数据 © OpenStreetMap 贡献者（ODbL）；地名搜索：OSM Nominatim；渲染引擎：ImmersiveMap（MIT）")
                         .font(.caption)
                         .foregroundStyle(.secondary)

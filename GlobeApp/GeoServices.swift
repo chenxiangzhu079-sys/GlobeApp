@@ -144,7 +144,6 @@ final class AppSettings: ObservableObject {
     @Published var shadows: Bool { didSet { save(shadows, "shadows") } }
     @Published var sphere: Bool { didSet { save(sphere, "sphere") } }
     @Published var engineControls: Bool { didSet { save(engineControls, "engineControls") } }
-    @Published var chineseLabels: Bool { didSet { save(chineseLabels, "chineseLabels") } }
 
     init() {
         let d = UserDefaults.standard
@@ -160,7 +159,6 @@ final class AppSettings: ObservableObject {
         shadows = load("shadows", true)
         sphere = load("sphere", true)
         engineControls = load("engineControls", false)
-        chineseLabels = load("chineseLabels", false)
     }
 
     private func save(_ value: Bool, _ key: String) {
