@@ -36,7 +36,7 @@ struct MapScreen: View {
     @State private var callbacksReady = false
     @FocusState private var searchFocused: Bool
 
-    private let rotateTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
+    private let rotateTimer = Timer.publish(every: 2.5, on: .main, in: .common).autoconnect()
 
     /// 开局视角：以中国为中心的全球视角。
     private static let overview = ImmersiveMapCameraPosition(latitudeDegrees: 27,
@@ -86,8 +86,9 @@ struct MapScreen: View {
     // MARK: 地图本体（设置全部走引擎现成开关）
 
     private var mapLayer: some View {
-        ImmersiveMapView()
+        var view = ImmersiveMapView()
             .camera(camera)
+            .cameraSettings(effectiveCameraSettings)
             .enableCameraUIControls(settings.engineControls)
             .night(settings.night)
             .labels(isEnabled: settings.labels)
@@ -97,10 +98,25 @@ struct MapScreen: View {
             .atmosphere(isEnabled: settings.atmosphere)
             .shadows(isEnabled: settings.shadows)
             .globe(isEnabled: settings.sphere)
+        if settings.chineseLabels {
+            view = view.labelSettings(language: ImmersiveMapSettings.LabelLanguage("zh"))
+        }
+        return view
             .markers(markers, coordinate: \.coordinate, anchor: .bottom) { marker in
                 PinView(title: marker.title, isMe: marker.isMe)
             }
             .ignoresSafeArea()
+    }
+
+    /// 自动旋转期间关掉引擎的「回正拉力」（GlobeUprightPull，默认开启）：
+    /// 它在低缩放下会把相机方位角与俯仰角持续往正北/正上方拉，
+    /// v2.1 真机实测表现为自动旋转转一段就被拽回复位、循环往复。
+    private var effectiveCameraSettings: ImmersiveMapSettings.CameraSettings {
+        var cam = ImmersiveMapSettings.default.camera
+        if autoRotate {
+            cam.globeUprightPull = nil
+        }
+        return cam
     }
 
     // MARK: 顶部搜索
@@ -363,12 +379,17 @@ struct MapScreen: View {
 
     private func rotateStep() {
         guard autoRotate, let current = camera.currentCameraPosition() else { return }
-        // bearing 单位为弧度：每步约 23°，3 秒一步，靠飞行动画衔接成慢转。
+        // 沿经度漂移实现自转：方位角（bearing）旋转会被引擎回正拉力拽回（见
+        // effectiveCameraSettings），经度不受该约束；每步东移 8°、飞行 2.4 秒，
+        // 与 2.5 秒的步进节奏衔接成近似连续的转动。
+        var lon = current.longitudeDegrees + 8
+        if lon > 180 { lon -= 360 }
         camera.fly(to: ImmersiveMapCameraPosition(latitudeDegrees: current.latitudeDegrees,
-                                                  longitudeDegrees: current.longitudeDegrees,
+                                                  longitudeDegrees: lon,
                                                   zoom: current.zoom,
-                                                  bearing: current.bearing + 0.4,
-                                                  pitch: current.pitch))
+                                                  bearing: current.bearing,
+                                                  pitch: current.pitch),
+                   options: CameraFlightOptions(duration: 2.4))
     }
 }
 
@@ -405,6 +426,7 @@ struct SettingsView: View {
                 Section("地图外观") {
                     Toggle("夜间模式", isOn: $settings.night)
                     Toggle("地名标注", isOn: $settings.labels)
+                    Toggle("地名中文显示", isOn: $settings.chineseLabels)
                     Toggle("大气层", isOn: $settings.atmosphere)
                     Toggle("阴影效果", isOn: $settings.shadows)
                 }
@@ -418,7 +440,7 @@ struct SettingsView: View {
                     Toggle("引擎自带相机控件", isOn: $settings.engineControls)
                 }
                 Section("关于") {
-                    LabeledContent("版本", value: "2.1")
+                    LabeledContent("版本", value: "2.2")
                     Text("地图数据 © OpenStreetMap 贡献者（ODbL）；地名搜索：OSM Nominatim；渲染引擎：ImmersiveMap（MIT）")
                         .font(.caption)
                         .foregroundStyle(.secondary)
