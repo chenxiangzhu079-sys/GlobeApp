@@ -282,8 +282,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/artembobkin/ImmersiveMap.git";
 			requirement = {
-				kind = exactVersion;
-				version = 0.11.0;
+				kind = revision;
+				revision = e80a812dc59c947c83fd8569b1b6bfaf5c1a6ffa;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
