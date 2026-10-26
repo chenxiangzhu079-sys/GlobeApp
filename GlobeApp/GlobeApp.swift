@@ -386,7 +386,7 @@ struct MapScreen: View {
                                                    zoom: current.zoom,
                                                    bearing: current.bearing,
                                                    pitch: current.pitch))
-    }    }
+    }
 }
 
 // MARK: - 标记针
