@@ -8,14 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		B10000000000000000000001 /* GlobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* GlobeApp.swift */; };
-		B10000000000000000000015 /* GeoServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* GeoServices.swift */; };
+		B10000000000000000000017 /* GeoServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* GeoServices.swift */; };
 		B10000000000000000000003 /* ImmersiveMap in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000004 /* ImmersiveMap */; };
 		B10000000000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		B10000000000000000000002 /* GlobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobeApp.swift; sourceTree = "<group>"; };
-		B10000000000000000000016 /* GeoServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoServices.swift; sourceTree = "<group>"; };
+		B10000000000000000000018 /* GeoServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoServices.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* GlobeApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlobeApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -44,7 +44,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000002 /* GlobeApp.swift */,
-				B10000000000000000000016 /* GeoServices.swift */,
+				B10000000000000000000018 /* GeoServices.swift */,
 				B10000000000000000000016 /* Assets.xcassets */,
 			);
 			path = GlobeApp;
@@ -134,7 +134,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000000000000000000001 /* GlobeApp.swift in Sources */,
-				B10000000000000000000015 /* GeoServices.swift in Sources */,
+				B10000000000000000000017 /* GeoServices.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
